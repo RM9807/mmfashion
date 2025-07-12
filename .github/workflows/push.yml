@@ -1,25 +1,28 @@
 name: Push MMFashion Model to Replicate
 
 on:
-  # Allow manual runs from the Actions tab
   workflow_dispatch:
     inputs:
       model_name:
-        description: 'Optional: Override the default model name.'
-        required: false 
-  
-  # Also run automatically on any push to the 'main' branch
-  push:
-    branches:
-      - main
+        description: 'Enter your Replicate model name (e.g., your-username/aura-body-shape-analysis)'
+        required: true
 
 jobs:
   push_to_replicate:
     name: Push MMFashion to Replicate
     runs-on: ubuntu-latest
+    
+    # ==========================================================
+    # THE DEFINITIVE FIX IS HERE
+    # ==========================================================
+    # This 'defaults' block sets the working directory for ALL subsequent 'run' steps in this job.
+    defaults:
+      run:
+        working-directory: ./mmfashion 
+        # Note: We assume the correct folder is 'mmfashion'. If the checkout creates a different name, adjust this.
+    # ==========================================================
 
     steps:
-      # ... (Your 'Free disk space' and 'Checkout' steps are fine) ...
       - name: Free disk space
         uses: jlumbroso/free-disk-space@v1.3.1
         with:
@@ -28,20 +31,20 @@ jobs:
 
       - name: Checkout repository code
         uses: actions/checkout@v4
+        with:
+          path: 'mmfashion' # We explicitly check out the code into a folder named 'mmfashion'
 
       - name: Setup Cog tool
         uses: replicate/setup-cog@v2
         with:
           token: ${{ secrets.REPLICATE_API_TOKEN }}
 
+      # This step will now run inside the './mmfashion' directory
       - name: Download model weights from GCS
         run: |
           mkdir -p checkpoints
           wget -O checkpoints/epoch_100.pth "https://storage.googleapis.com/aura-world-class-models-300b/epoch_100.pth"
 
-      # ==========================================================
-      # THE FIX IS HERE
-      # ==========================================================
+      # This step will ALSO run inside the './mmfashion' directory
       - name: Push to Replicate
-        # This logic says: "Use the manual input if it exists, otherwise, use the repository variable."
-        run: cog push r8.im/${{ inputs.model_name || vars.REPLICATE_MODEL_NAME }}
+        run: cog push r8.im/${{ inputs.model_name }}
