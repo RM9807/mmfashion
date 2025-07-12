@@ -1,0 +1,26 @@
+name: Push to Replicate
+
+on:
+  push:
+    branches: [main, master]
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Push to Replicate
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+        run: |
+          # Install Cog
+          curl -o /usr/local/bin/cog -L https://github.com/replicate/cog/releases/latest/download/cog_`uname -s`_`uname -m`
+          chmod +x /usr/local/bin/cog
+          
+          # Download the checkpoint file
+          mkdir -p checkpoints
+          wget -O checkpoints/epoch_100.pth https://storage.googleapis.com/aura-world-class-models-300b/epoch_100.pth
+          
+          # Build and push the model
+          cog push 
