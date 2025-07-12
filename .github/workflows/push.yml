@@ -1,26 +1,47 @@
-name: Push to Replicate
+name: Push MMFashion Model to Replicate
 
 on:
+  # Allow manual runs from the Actions tab
+  workflow_dispatch:
+    inputs:
+      model_name:
+        description: 'Optional: Override the default model name.'
+        required: false 
+  
+  # Also run automatically on any push to the 'main' branch
   push:
-    branches: [main, master]
+    branches:
+      - main
 
 jobs:
-  push:
+  push_to_replicate:
+    name: Push MMFashion to Replicate
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Push to Replicate
-        env:
-          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+      # ... (Your 'Free disk space' and 'Checkout' steps are fine) ...
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          docker-images: false
+
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      - name: Setup Cog tool
+        uses: replicate/setup-cog@v2
+        with:
+          token: ${{ secrets.REPLICATE_API_TOKEN }}
+
+      - name: Download model weights from GCS
         run: |
-          # Install Cog
-          curl -o /usr/local/bin/cog -L https://github.com/replicate/cog/releases/latest/download/cog_`uname -s`_`uname -m`
-          chmod +x /usr/local/bin/cog
-          
-          # Download the checkpoint file
           mkdir -p checkpoints
-          wget -O checkpoints/epoch_100.pth https://storage.googleapis.com/aura-world-class-models-300b/epoch_100.pth
-          
-          # Build and push the model
-          cog push
+          wget -O checkpoints/epoch_100.pth "https://storage.googleapis.com/aura-world-class-models-300b/epoch_100.pth"
+
+      # ==========================================================
+      # THE FIX IS HERE
+      # ==========================================================
+      - name: Push to Replicate
+        # This logic says: "Use the manual input if it exists, otherwise, use the repository variable."
+        run: cog push r8.im/${{ inputs.model_name || vars.REPLICATE_MODEL_NAME }}
