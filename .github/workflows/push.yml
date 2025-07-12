@@ -23,4 +23,4 @@ jobs:
           wget -O checkpoints/epoch_100.pth https://storage.googleapis.com/aura-world-class-models-300b/epoch_100.pth
           
           # Build and push the model
-          cog push 
+          cog push
