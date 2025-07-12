@@ -1,4 +1,4 @@
-name: Push MMFashion Model to Replicate (Definitive)
+name: Push MMFashion Model to Replicate (Timeout-Proof)
 
 on:
   workflow_dispatch:
@@ -22,42 +22,34 @@ jobs:
       - name: Checkout repository code
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
       - name: Setup Cog tool
         uses: replicate/setup-cog@v2
         with:
           token: ${{ secrets.REPLICATE_API_TOKEN }}
 
-      # ==========================================================
-      # THE "SOLVE THIS FOREVER" SCRIPT
-      # ==========================================================
-      - name: Find, Download, and Push
+      - name: Download model weights from GCS
         run: |
-          echo "Searching for cog.yaml in the entire workspace..."
-          
-          # Find the directory containing cog.yaml
-          # This searches for the file and gets its parent directory path
-          COG_DIR=$(find . -name cog.yaml -print -quit | xargs dirname)
-          
-          if [ -z "$COG_DIR" ]; then
-            echo "::error::Could not find cog.yaml anywhere! Listing all files for debugging:"
-            ls -R
-            exit 1
-          fi
-          
-          echo "Found cog.yaml in directory: $COG_DIR"
-          echo "This will be our working directory."
-
-          # Change into the correct directory first
-          cd "$COG_DIR"
-
-          echo "Current directory is now: $(pwd)"
-          echo "Downloading model weights into this directory..."
-          
-          # Now, run the download from within the correct directory
           mkdir -p checkpoints
           wget -O checkpoints/epoch_100.pth "https://storage.googleapis.com/aura-world-class-models-300b/epoch_100.pth"
 
-          echo "Download complete. Pushing to Replicate..."
+      # ==========================================================
+      # THE FIX: SPLIT BUILD AND PUSH
+      # ==========================================================
+      - name: Build Cog model image
+        # The --push flag is removed. This step only builds the image locally on the runner.
+        run: cog build -t r8.im/${{ inputs.model_name }}
 
-          # Finally, run the push command from this directory
-          cog push r8.im/${{ inputs.model_name }}
+      - name: Push model to Replicate
+        # This step only pushes the already-built image. It's much faster.
+        run: cog push r8.im/${{ inputs.model_name }}
